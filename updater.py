@@ -6,8 +6,6 @@ from datetime import datetime, timedelta  # For scheduling daily checks
 repo_url = "https://api.github.com/repos/IsraelCohen54/Auto-Update-Listeners"
 
 
-check1_wow = 505
-
 # Update check interval (in days)
 update_interval = 1
 
