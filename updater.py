@@ -8,7 +8,6 @@ import shutil
 repo_url = "https://api.github.com/repos/IsraelCohen54/Auto-Update-Listeners"
 repo_cloning_url = "https://github.com/IsraelCohen54/Auto-Update-Listeners.git"
 
-
 # Cloned folder relative path
 folder_to_delete = "./updated_project"
 
@@ -43,6 +42,9 @@ def check_for_update():
                     f.write(latest_version_tag_name)  # Overwrite version with new tag
                     f.truncate()  # Remove extra characters
 
+                    # Change permissions to 0o777 (full access for owner, group, and others)
+                    change_permissions_recursive(folder_to_delete, 0o777)
+
                     # Use os.path.exists() to check if the folder exists before attempting to delete it
                     if os.path.exists(folder_to_delete):
                         # Use shutil.rmtree() to delete the folder and all of its contents recursively
@@ -67,6 +69,15 @@ def update_script():
     # subprocess.run(["python", "the_functionality.py"])  # Example for restarting
 
     print("Successfully updated project from GitHub!")
+
+
+# Change permissions recursively for the folder and its contents
+def change_permissions_recursive(path, mode):
+    for root, dirs, files in os.walk(path):
+        for dir in dirs:
+            os.chmod(os.path.join(root, dir), mode)
+        for file in files:
+            os.chmod(os.path.join(root, file), mode)
 
 
 if __name__ == "__main__":
