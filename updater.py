@@ -11,7 +11,6 @@ repo_cloning_url = "https://github.com/IsraelCohen54/Auto-Update-Listeners.git"
 # Cloned folder relative path
 folder_to_delete = "./updated_project"
 
-check1_wow = 505
 
 # Update check interval (in days)
 update_interval = 1
