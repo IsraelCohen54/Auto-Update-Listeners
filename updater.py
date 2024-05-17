@@ -3,6 +3,7 @@ import subprocess  # For secure updates using Git
 from datetime import datetime, timedelta  # For scheduling daily checks
 import os
 import shutil
+import time
 
 # Replace with your actual GitHub repository URL
 repo_url = "https://api.github.com/repos/IsraelCohen54/Auto-Update-Listeners"
@@ -18,56 +19,72 @@ update_interval = 1
 
 def check_for_update():
     # Check if it's time for an update (based on interval)
-    if datetime.now() - timedelta(seconds=update_interval) >= datetime.utcnow():  ## todo check utc
-        response = requests.get(repo_url + "/releases/latest")
-        if response.status_code == 200:
-            latest_version_tag_name = response.json()["tag_name"]
-            with open("version.txt", "r+") as f:  # Open in read/write mode
-                ver = f.read()
-                try:
-                    # Attempt to convert version number to float (handles decimals)
-                    current_version = float(ver)
-                    latest_version = float(latest_version_tag_name)
-                except ValueError:
-                    # Handle non-numeric version formats (e.g., pre-release labels)
-                    # todo write to github maybe?
-                    #  print(f"Warning: Version format not recognized. Current: {ver},
-                    #  Latest: {latest_version_tag_name}")
-                    return  # Exit function if versions can't be compared numerically
+    if datetime.utcnow() - timedelta(seconds=update_interval) >= datetime.utcnow():
+        max_retries = 3  # Set the maximum number of retries for request.get
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = requests.get(repo_url + "/releases/latest")
+                if response.status_code == 200:
+                    latest_version_tag_name = response.json()["tag_name"]
+                    with open("version.txt", "r+") as f:  # Open in read/write mode
+                        ver = f.read()
+                        try:
+                            # Attempt to convert version number to float (handles decimals)
+                            current_version = float(ver)
+                            latest_version = float(latest_version_tag_name)
+                        except ValueError:
+                            # Handle non-numeric version formats (e.g., pre-release labels)
+                            # todo write to github maybe?
+                            #  print(f"Warning: Version format not recognized. Current: {ver},
+                            #  Latest: {latest_version_tag_name}")
+                            return  # Exit function if versions can't be compared numerically
 
-                if latest_version > current_version:
-                    update_script()
-                    f.seek(0)  # Move to the beginning of the file
-                    f.write(latest_version_tag_name)  # Overwrite version with new tag
-                    f.truncate()  # Remove extra characters
+                        if latest_version > current_version:
+                            update_script()
+                            f.seek(0)  # Move to the beginning of the file
+                            f.write(latest_version_tag_name)  # Overwrite version with new tag
+                            f.truncate()  # Remove extra characters
 
-                    # Change permissions to 0o777 (full access for owner, group, and others)
-                    change_permissions_recursive(folder_to_delete, 0o777)
+                            # Change permissions to 0o777 (full access for owner, group, and others)
+                            change_permissions_recursive(folder_to_delete, 0o777)
 
-                    # Use os.path.exists() to check if the folder exists before attempting to delete it
-                    if os.path.exists(folder_to_delete):
-                        # Use shutil.rmtree() to delete the folder and all of its contents recursively
-                        shutil.rmtree(folder_to_delete)
-                        print(f"Folder '{folder_to_delete}' and its contents deleted successfully.")
-                    else:
-                        print(f"Folder '{folder_to_delete}' does not exist.")
+                            # Use os.path.exists() to check if the folder exists before attempting to delete it
+                            if os.path.exists(folder_to_delete):
+                                # Use shutil.rmtree() to delete the folder and all of its contents recursively
+                                shutil.rmtree(folder_to_delete)
+                                print(f"Folder '{folder_to_delete}' and its contents deleted successfully.")
+                            else:
+                                print(f"Folder '{folder_to_delete}' does not exist.")
 
+                    break  # Exit the loop on successful request
+            except requests.exceptions.RequestException as e:
+                print(f"Attempt {attempt}/{max_retries}: Error fetching update info: {e}")
+                time.sleep(2 ** attempt)  # Exponential backoff between retries
+        else:
+            print("Failed to retrieve update information after retries.")
 
-# todo defend vs internet crushes
-# todo delete clone folder at end
 def update_script():
-    # Clone the entire repository (including updates)
-    subprocess.run(["git", "clone", "--depth=1", repo_cloning_url, "./updated_project"])  # Clone into a sub-folder
+    # Clone the entire repository (including updates) with retry logic
+    max_retries = 3  # Set the maximum number of retries for cloning
+    for attempt in range(1, max_retries + 1):
+        try:
+            subprocess.run(["git", "clone", "--depth=1", repo_cloning_url, "./updated_project"])
 
-    # Replace existing files with updated versions
-    shutil.copy2("./updated_project/the_functionality.py", ".")
-    shutil.copy2("./updated_project/updater.py", ".")
-    shutil.copy2("./updated_project/version.txt", ".")
+            # Replace existing files with updated versions
+            shutil.copy2("./updated_project/the_functionality.py", ".")
+            shutil.copy2("./updated_project/updater.py", ".")
+            shutil.copy2("./updated_project/version.txt", ".")
 
-    # Optional: Restart functionality (consider platform-specific approaches)
-    # subprocess.run(["python", "the_functionality.py"])  # Example for restarting
+            # Optional: Restart functionality (consider platform-specific approaches)
+            # subprocess.run(["python", "the_functionality.py"])  # Example for restarting
 
-    print("Successfully updated project from GitHub!")
+            print("Successfully updated project from GitHub!")
+            break  # Exit the loop on successful cloning
+        except subprocess.CalledProcessError as e:
+            print(f"Attempt {attempt}/{max_retries}: Error cloning repository: {e}")
+            time.sleep(2 ** attempt)  # Exponential backoff between retries
+    else:
+        print("Failed to clone the updated project after retries.")
 
 
 # Change permissions recursively for the folder and its contents
